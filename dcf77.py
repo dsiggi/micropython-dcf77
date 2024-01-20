@@ -131,8 +131,8 @@ class dcf77:
                         self.__custom_irq()
                         self.__print("Last Transmission: ", self.signal_last)
 
-    # Function to decoding the date and time informations
-    def __decode_timedate(self, time, check_parity):
+    # Function to decoding the time informations
+    def __decode_time(self, time, check_parity):
         vals = [1, 2, 4, 8, 10, 20, 40, 80] # Values for the bit positions
         sum = 0 # Counter variable
         parity_check = 0 # Counter variable for the parity check
@@ -160,6 +160,51 @@ class dcf77:
                     return 999
         
         return sum
+    
+    # Function to decoding the date informations
+    def __decode_date(self, date, check_parity=True):
+        vals = [1, 2, 4, 8, 10, 20, 40, 80] # Values for the bit positions
+        parity_check = 0 # Counter variable for the parity check
+
+        # Checking parity
+        # If a even number of bits was TRUE the parity
+        # has to be FALSE
+        if check_parity:
+            for t in range(len(date) - 1):
+                if date[t]:
+                    parity_check += 1
+
+            if ( parity_check % 2 ) == 0:
+                if date[-1]:
+                    self.valid = False
+                    self.__print("Parity is not correct")
+                    return [999, 999, 999, 999]
+            
+        # Decoding Day of month
+        DayOfMonth = 0
+        for v, b in enumerate(date[0:6]):
+            if b:
+                DayOfMonth += vals[v]
+
+        # Decoding the weekday
+        Weekday = 0
+        for v, b in enumerate(date[6:9]):
+            if b:
+                Weekday += vals[v]
+
+        # Decoding the month
+        Month = 0
+        for v, b in enumerate(date[9:14]):
+            if b:
+                Month += vals[v]
+
+        # Decoding the year
+        Year = 0
+        for v, b in enumerate(date[14:22]):
+            if b:
+                Year += vals[v]
+       
+        return [DayOfMonth, Weekday, Month, Year]
     
     # Decoding the telegram
     def __decode(self, with_seconds=False):
@@ -201,12 +246,9 @@ class dcf77:
             return
         
         # Decoding
-        minutes = self.__decode_timedate(self.signal_last[21:29], True)
-        hours = self.__decode_timedate(self.signal_last[29:36], True)
-        day = self.__decode_timedate(self.signal_last[36:42], False)
-        weekday = self.__decode_timedate(self.signal_last[42:45], False)
-        month = self.__decode_timedate(self.signal_last[45:50], False)
-        year = self.__decode_timedate(self.signal_last[50:59], True)
+        minutes = self.__decode_time(self.signal_last[21:29], True)
+        hours = self.__decode_time(self.signal_last[29:36], True)
+        day, weekday, month, year = self.__decode_date(self.signal_last[36:59], True)
         
         seconds = 0
         if with_seconds:
