@@ -10,7 +10,6 @@ tco_pin = The pin object for the pin where the receiver is connected
 false_time = Min/Max time in ms for detecing a 0 pulse
 true_time = Min/Max time in ms for detecting a 1 pulse
 pause_time = Min/Max time in ms for detecting the beginning of the telegramm
-debug = If true the class will print debug messages to console
 ```
 ```python
 >>> dcf = dcf77.dcf77(machine.Pin(0))
@@ -71,6 +70,12 @@ Enables an custom irq handler for various events. \
 -   ```IRQ_DST``` = irq is fired when the DST flag changes to TRUE
 ```python
 >>> dcf.irq(mode=[dcf.IRQ_DAY, dcf.IRQ_DST], handler=myhandler)
+```
+
+### debug
+Enable and disable debug messages on the console.
+```python
+>>> dcf.debug(True)
 ```
 
 ## Sample Code

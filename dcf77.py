@@ -1,5 +1,7 @@
 '''
 2023-11-17  -   First release
+2024-01-20  -   - Bugfix for date decoding and parity check
+                - Disable and enable debug messages with separate function
 '''
 
 import utime
@@ -17,20 +19,18 @@ class dcf77:
     def __init__ (self, tco_pin: Pin,
                   false_time: list[int] = [50, 130],
                   true_time: list[int] = [150, 230],
-                  pause_time: list[int] = [1700, 2500],
-                  debug = False):
+                  pause_time: list[int] = [1700, 2500]):
         '''
         - ``tco_pin``: Pin object of the TCO pin
         - ``false_time``: Minimum/Maximum impulse width for a FALSE signal
         - ``true_time``: Minimum/Maximum impulse width for a TRUE signal
         - ``pause_time``: Minimum/Maximum pause to recognize tick 59
-        - ``debug``: Print debug messages
         '''
         self.FALSE_TIME = false_time
         self.TRUE_TIME = true_time
         self.TICK59_TIME = pause_time
         self.TCO = tco_pin
-        self.DEBUG = debug
+        self.DEBUG = False
         self.TIMEOUT_TIME = self.TICK59_TIME[1] + 1000
 
         self.irq_start = 0  #Starttime of the interrupt
@@ -372,3 +372,7 @@ class dcf77:
         '''
         self.irq_mode = mode
         self.irq_handler = handler
+
+    # Enable/Disable debug messages
+    def debug(self, mode=False):
+        self.DEBUG = mode
