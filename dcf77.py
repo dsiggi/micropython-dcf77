@@ -1,11 +1,13 @@
-'''
+"""
 2023-11-17  -   First release
 2024-01-20  -   - Bugfix for date decoding and parity check
                 - Disable and enable debug messages with separate function
-'''
+2025-06-09  -   Use hardware timer if virtual timers are not supported
+"""
 
 import utime
 from machine import Pin, Timer
+
 
 class dcf77:
     # Constants for the irq handler
@@ -16,16 +18,23 @@ class dcf77:
     IRQ_YEAR = 4
     IRQ_DST = 5
 
-    def __init__ (self, tco_pin: Pin,
-                  false_time: list[int] = [50, 130],
-                  true_time: list[int] = [150, 230],
-                  pause_time: list[int] = [1700, 2500]):
-        '''
+    # Timer to use
+    # negativ values are virtual timers.
+    timer = -1
+
+    def __init__(
+        self,
+        tco_pin: Pin,
+        false_time: list[int] = [50, 130],
+        true_time: list[int] = [150, 230],
+        pause_time: list[int] = [1700, 2500],
+    ):
+        """
         - ``tco_pin``: Pin object of the TCO pin
         - ``false_time``: Minimum/Maximum impulse width for a FALSE signal
         - ``true_time``: Minimum/Maximum impulse width for a TRUE signal
         - ``pause_time``: Minimum/Maximum pause to recognize tick 59
-        '''
+        """
         self.FALSE_TIME = false_time
         self.TRUE_TIME = true_time
         self.TICK59_TIME = pause_time
@@ -33,16 +42,30 @@ class dcf77:
         self.DEBUG = False
         self.TIMEOUT_TIME = self.TICK59_TIME[1] + 1000
 
-        self.irq_start = 0  #Starttime of the interrupt
-        self.irq_last = 0   #Time of last interrupt
-        self.last_pulse = 0 #Length of last pulse
-        self.timer_timeout = Timer(-1) #Timer for timeout handling
+        self.irq_start = 0  # Starttime of the interrupt
+        self.irq_last = 0  # Time of last interrupt
+        self.last_pulse = 0  # Length of last pulse
 
-        self.found59 = False    #Tick59 was found
-        self.tick = 0           #Actual tick
-        self.signal = []        #Actual received signal
-        self.signal_last = []   #Last received signal
-        self.valid = False      #Signal is valid
+        # Try to initalize a virtual timer.
+        # If the micropython port doesen't support virtual timers, switch to a hardware timer.
+        if self.timer == -1:
+            try:
+                self.timer_timeout = Timer(self.timer)  # Initalize virtual timer
+            except ValueError:
+                self.timer = 0
+                self.timer_timeout = Timer(
+                    self.timer
+                )  # Virtual timer not supported, use hardware timer 0
+        else:
+            self.timer_timeout = Timer(
+                self.timer
+            )  # Use custom timer (virtual or hardware)
+
+        self.found59 = False  # Tick59 was found
+        self.tick = 0  # Actual tick
+        self.signal = []  # Actual received signal
+        self.signal_last = []  # Last received signal
+        self.valid = False  # Signal is valid
         self.datetime = [0, 0, 0, 0, 0, 0, 0, 0]
         self.datetime_last = [0, 0, 0, 0, 0, 0, 0, 0]
         self.dst_changed = False
@@ -53,7 +76,7 @@ class dcf77:
     # Function to print debug messages
     def __print(self, *val):
         if self.DEBUG:
-            text = ''
+            text = ""
             for v in range(len(val)):
                 text += str(val[v])
 
@@ -74,12 +97,18 @@ class dcf77:
     # Main function. Called from the interrupt handler
     def __run(self):
         # Starting the timeout timer
-        self.timer_timeout.init(mode=Timer.ONE_SHOT, period=self.TIMEOUT_TIME, callback=self.__timeout_callback)
+        self.timer_timeout.init(
+            mode=Timer.ONE_SHOT,
+            period=self.TIMEOUT_TIME,
+            callback=self.__timeout_callback,
+        )
 
         # If the last edge was detected between min/max TICK59_TIME
         # we have found the beginning of the telegram
-        if utime.ticks_diff(utime.ticks_ms(), self.irq_last) > self.TICK59_TIME[0] \
-            and utime.ticks_diff(utime.ticks_ms(), self.irq_last) < self.TICK59_TIME[1]:
+        if (
+            utime.ticks_diff(utime.ticks_ms(), self.irq_last) > self.TICK59_TIME[0]
+            and utime.ticks_diff(utime.ticks_ms(), self.irq_last) < self.TICK59_TIME[1]
+        ):
             if not self.found59:
                 self.__print("Found Tick 59")
                 self.tick = 0
@@ -133,9 +162,9 @@ class dcf77:
 
     # Function to decoding the time informations
     def __decode_time(self, time, check_parity):
-        vals = [1, 2, 4, 8, 10, 20, 40, 80] # Values for the bit positions
-        sum = 0 # Counter variable
-        parity_check = 0 # Counter variable for the parity check
+        vals = [1, 2, 4, 8, 10, 20, 40, 80]  # Values for the bit positions
+        sum = 0  # Counter variable
+        parity_check = 0  # Counter variable for the parity check
 
         # If check_parity is True the last value in the list is the parity
         # so we should not count this value
@@ -143,7 +172,7 @@ class dcf77:
         if check_parity:
             end -= 1
 
-        # Counting the time or date    
+        # Counting the time or date
         for t in range(end):
             if time[t]:
                 sum += vals[t]
@@ -153,18 +182,18 @@ class dcf77:
         # If a even number of bits was TRUE the parity
         # has to be FALSE
         if check_parity:
-            if ( parity_check % 2 ) == 0:
+            if (parity_check % 2) == 0:
                 if time[-1]:
                     self.valid = False
                     self.__print("Parity is not correct")
                     return 999
-        
+
         return sum
-    
+
     # Function to decoding the date informations
     def __decode_date(self, date, check_parity=True):
-        vals = [1, 2, 4, 8, 10, 20, 40, 80] # Values for the bit positions
-        parity_check = 0 # Counter variable for the parity check
+        vals = [1, 2, 4, 8, 10, 20, 40, 80]  # Values for the bit positions
+        parity_check = 0  # Counter variable for the parity check
 
         # Checking parity
         # If a even number of bits was TRUE the parity
@@ -174,12 +203,12 @@ class dcf77:
                 if date[t]:
                     parity_check += 1
 
-            if ( parity_check % 2 ) == 0:
+            if (parity_check % 2) == 0:
                 if date[-1]:
                     self.valid = False
                     self.__print("Parity is not correct")
                     return [999, 999, 999, 999]
-            
+
         # Decoding Day of month
         DayOfMonth = 0
         for v, b in enumerate(date[0:6]):
@@ -203,12 +232,12 @@ class dcf77:
         for v, b in enumerate(date[14:22]):
             if b:
                 Year += vals[v]
-       
+
         return [DayOfMonth, Weekday, Month, Year]
-    
+
     # Decoding the telegram
     def __decode(self, with_seconds=False):
-        '''
+        """
         Decoding the DCF77 signal.
         If ``None`` is returned the signal is not valid
         If some value return ``999`` the decoding failed
@@ -227,14 +256,14 @@ class dcf77:
         Bit 45..49  = Monat
         Bit 50..58  = Jahr mit Parität
         Bit 59      = Kein Impuls
-        '''
+        """
 
         # Signal to short or to long
         if len(self.signal_last) != 59:
             self.__print("Signal not valid -- Shorter or longer as 59 ticks")
             self.valid = False
             return
-        
+
         # Checking some bits that must be everytime 0 or 1
         if self.signal_last[0]:
             self.__print("Bit 0 is not FALSE")
@@ -244,18 +273,18 @@ class dcf77:
             self.__print("Bit 20 is not TRUE")
             self.valid = False
             return
-        
+
         # Decoding
         minutes = self.__decode_time(self.signal_last[21:29], True)
         hours = self.__decode_time(self.signal_last[29:36], True)
         day, weekday, month, year = self.__decode_date(self.signal_last[36:59], True)
-        
+
         seconds = 0
         if with_seconds:
             seconds = self.tick
 
         self.datetime_last = self.datetime.copy()
-        self.datetime = [ year, month, day, weekday - 1, hours, minutes, seconds , 0]
+        self.datetime = [year, month, day, weekday - 1, hours, minutes, seconds, 0]
 
     # Function to run the custom irq handler
     def __custom_irq(self):
@@ -296,20 +325,21 @@ class dcf77:
 
     # Function to start fetching the DCF77 signal
     def start(self):
-        '''
+        """
         Start fetching time informations
-        '''
+        """
         # Configure IRQ
-        self.TCO.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, 
-                     handler=self.__handler_interrupt)
-        
+        self.TCO.irq(
+            trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self.__handler_interrupt
+        )
+
         self.__print("Start decoding")
 
     # Function to stop fetching the DCF77 signal
     def stop(self):
-        '''
+        """
         Stop fetching time informations
-        '''
+        """
         # Disable IRQ
         self.TCO.irq(handler=None)
         self.timer_timeout.deinit()
@@ -318,15 +348,15 @@ class dcf77:
 
     # Function that returns the last fetched signal
     def get_LastSignal(self):
-        '''
+        """
         Return the last fetched signal as list
-        '''
+        """
         return self.signal_last
-    
+
     # Function that returns the actual time and date informations
-    def get_DateTime(self, with_seconds = False):
-        '''
-        Returns the actual time and date informations as an 8-tuple 
+    def get_DateTime(self, with_seconds=False):
+        """
+        Returns the actual time and date informations as an 8-tuple
         which contains: year, month, day, weekday, hours, minutes, seconds, subseconds
         This tuple can be directly used with the machine.RTC module
 
@@ -336,31 +366,37 @@ class dcf77:
 
         - If ``None`` is returned the signal is not valid
         - If some value return ``999`` the decoding failed
-        '''
+        """
         return self.datetime
-    
+
     # Function that returns some status informations
     def get_Infos(self):
-        '''
+        """
         Returns some status informations as dict
-        '''
-        info = {    "Found59": self.found59,
-                    "Valid": self.valid,
-                    "Last pulse length": self.last_pulse,
-                    "Tick": self.tick}
-        
+        """
+        info = {
+            "Found59": self.found59,
+            "Valid": self.valid,
+            "Last pulse length": self.last_pulse,
+            "Tick": self.tick,
+        }
+
         if self.valid:
-            info.update({"Call bit": self.signal_last[15],
-                        "Summer time announcement": self.signal_last[16],
-                        "CEST": self.signal_last[17],
-                        "CET": self.signal_last[18],
-                        "Leap second": self.signal_last[19] })
+            info.update(
+                {
+                    "Call bit": self.signal_last[15],
+                    "Summer time announcement": self.signal_last[16],
+                    "CEST": self.signal_last[17],
+                    "CET": self.signal_last[18],
+                    "Leap second": self.signal_last[19],
+                }
+            )
 
         return info
-    
+
     # Enable an custom irq handler
     def irq(self, mode: list[int] = [0], handler=None):
-        '''
+        """
         Enables an custom irq handler for various events.
         ```Mode``` has to be a list of the following modes:
         - ```IRQ_MINUTE``` = irq is fired when the minute changed
@@ -369,7 +405,7 @@ class dcf77:
         - ```IRQ_MONTH``` = irq is fired when the month changed
         - ```IRQ_YEAR``` = irq is fired when the year changed
         - ```IRQ_DST``` = irq is fired when the DST flag changes to TRUE
-        '''
+        """
         self.irq_mode = mode
         self.irq_handler = handler
 

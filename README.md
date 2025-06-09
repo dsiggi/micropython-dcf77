@@ -78,6 +78,18 @@ Enable and disable debug messages on the console.
 >>> dcf.debug(True)
 ```
 
+### Used timer
+By default, an attempt is made to use the virtual timer -1. If this is not available in the port used, the hardware timer 0 is used.
+
+However, the timer can also be freely selected.
+To do this, insert the following code before initializing the module:
+```python
+import dcf77
+
+dcf77.dcf77.timer = 2 # Using hardware timer 2
+dcf = dcf77.dcf77(machine.Pin(0))
+```
+
 ## Sample Code
 ```python
 import machine
