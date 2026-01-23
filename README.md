@@ -10,6 +10,7 @@ tco_pin = The pin object for the pin where the receiver is connected
 false_time = Min/Max time in ms for detecing a 0 pulse
 true_time = Min/Max time in ms for detecting a 1 pulse
 pause_time = Min/Max time in ms for detecting the beginning of the telegramm
+inverted = DCF77 module sends an inverted signal
 ```
 ```python
 >>> dcf = dcf77.dcf77(machine.Pin(0))
