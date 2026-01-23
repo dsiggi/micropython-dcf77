@@ -2,7 +2,10 @@
 2023-11-17  -   First release
 2024-01-20  -   - Bugfix for date decoding and parity check
                 - Disable and enable debug messages with separate function
-2025-06-09  -   Use hardware timer if virtual timers are not supported
+2025-06-09  -   Use hardware timer if virtual timers are not
+2026-01-23  -   - Added the option to also use a signal source with an inverted signal. This resolves Issue #3
+                - Added some more debug information as suggested in Issue #3
+                - Changed the year format to 4 digits
 """
 
 import utime
@@ -17,6 +20,10 @@ class dcf77:
     IRQ_MONTH = 3
     IRQ_YEAR = 4
     IRQ_DST = 5
+
+    # The offset for the year
+    # The dcf protocol only provides two-digit year number
+    YEAR_OFFSET = 2000
 
     # Timer to use
     # negativ values are virtual timers.
@@ -243,7 +250,7 @@ class dcf77:
                 Month += vals[v]
 
         # Decoding the year
-        Year = 0
+        Year = self.YEAR_OFFSET
         for v, b in enumerate(date[14:22]):
             if b:
                 Year += vals[v]

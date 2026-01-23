@@ -91,6 +91,13 @@ dcf77.dcf77.timer = 2 # Using hardware timer 2
 dcf = dcf77.dcf77(machine.Pin(0))
 ```
 
+## Variables
+The DCF protocol only provides a two-digit year number. To form the complete year from this, there is the variable YEAR_OFFSET. This is set to 2000 by default.
+```python
+# Set the year offset to 2100
+dcf.YEAR_OFFET = 2100
+```
+
 ## Sample Code
 ```python
 import machine
