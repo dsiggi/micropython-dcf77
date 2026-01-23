@@ -141,10 +141,14 @@ class dcf77:
             # Is the pulse a 0 or 1?
             if diff >= self.FALSE_TIME[0] and diff <= self.FALSE_TIME[1]:
                 val = 0
+                self.__print("Detected '0'")
             elif diff >= self.TRUE_TIME[0] and diff <= self.TRUE_TIME[1]:
                 val = 1
+                self.__print("Detected '1'")
             else:
-                self.__print("Wrong pulse width - Start new scanning for tick 59")
+                self.__print(
+                    f"Wrong pulse width {diff} - Start new scanning for tick 59"
+                )
                 self.found59 = False
                 self.signal.clear()
 
