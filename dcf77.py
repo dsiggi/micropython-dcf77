@@ -28,12 +28,14 @@ class dcf77:
         false_time: list[int] = [50, 130],
         true_time: list[int] = [150, 230],
         pause_time: list[int] = [1700, 2500],
+        inverted: bool = False,
     ):
         """
         - ``tco_pin``: Pin object of the TCO pin
         - ``false_time``: Minimum/Maximum impulse width for a FALSE signal
         - ``true_time``: Minimum/Maximum impulse width for a TRUE signal
         - ``pause_time``: Minimum/Maximum pause to recognize tick 59
+        - ``inverterted``: DCF77 module sends an inverted signal
         """
         self.FALSE_TIME = false_time
         self.TRUE_TIME = true_time
@@ -41,6 +43,7 @@ class dcf77:
         self.TCO = tco_pin
         self.DEBUG = False
         self.TIMEOUT_TIME = self.TICK59_TIME[1] + 1000
+        self.inverted = inverted
 
         self.irq_start = 0  # Starttime of the interrupt
         self.irq_last = 0  # Time of last interrupt
@@ -94,6 +97,14 @@ class dcf77:
         self.signal.clear()
         self.__print("Signal timeout - Start new scanning for tick 59")
 
+    # Get the signal
+    def __get_signal(self):
+        val = self.TCO.value()
+        if self.inverted:
+            return not val
+
+        return val
+
     # Main function. Called from the interrupt handler
     def __run(self):
         # Starting the timeout timer
@@ -118,7 +129,7 @@ class dcf77:
         self.irq_last = utime.ticks_ms()
         # If the signal from the DCF module is low
         # we save the time
-        if not self.TCO.value():
+        if not self.__get_signal():
             self.irq_start = utime.ticks_ms()
         else:
             # The signal from the DCF module is high
