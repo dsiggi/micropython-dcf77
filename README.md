@@ -1,3 +1,5 @@
+⚠️ Archived, moved to Codeberg: https://codeberg.org/dsiggi/micropython-dcf77 ⚠️
+
 # micropython-dcf77
 
 Micropython modul to decode the dcf77 signal delivered by a receiver module.
